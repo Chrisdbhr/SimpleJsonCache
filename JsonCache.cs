@@ -37,12 +37,13 @@ public static class JsonCache {
 	public static async Task<List<JSONNode>> GetAllJsonInsideFolderAsync(string directoryPath, bool recursive = false, string fileName = "") {
 		var jsonNodeList = new List<JSONNode>();
 		try {
-			directoryPath = Path.GetDirectoryName(Path.Combine(ROOT_FOLDER, directoryPath));
+			directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
 			if (!Directory.Exists(directoryPath)) return jsonNodeList;
 			var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 			foreach (var completeFilePath in filesPath) {
 				var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
 				if (string.IsNullOrEmpty(filePath)) continue;
+				filePath = filePath.Replace('\\', '/');
 				var json = await LoadJsonAsync(filePath);
 				if (json != null) jsonNodeList.Add(json);
 			}
