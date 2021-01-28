@@ -10,7 +10,7 @@ public static class JsonCache {
 
 	#region <<---------- Properties ---------->>
 	
-	public const string ROOT_FOLDER = "JsonData/";
+	public const string ROOT_FOLDER = "../JsonData/";
 	
 	#endregion <<---------- Properties ---------->>
 
@@ -29,7 +29,7 @@ public static class JsonCache {
 
 		// write
 		await using (StreamWriter writer = File.CreateText(filePathWithExtension)) {
-			Console.WriteLine($"Writing file: {filePathWithExtension}");
+			Console.WriteLine($"Writing file: {filePathWithExtension.Replace(ROOT_FOLDER, string.Empty)}");
 			await writer.WriteAsync(jsonNode.ToString(4));
 		}
 	}
