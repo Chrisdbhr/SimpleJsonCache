@@ -38,7 +38,10 @@ public static class JsonCache {
 		var jsonNodeList = new List<JSONNode>();
 		try {
 			directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
-			if (!Directory.Exists(directoryPath)) return jsonNodeList;
+			if (!Directory.Exists(directoryPath))
+			{
+				throw new Exception("Folder path not found  :" + directoryPath);
+			}
 			var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 			foreach (var completeFilePath in filesPath) {
 				var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
