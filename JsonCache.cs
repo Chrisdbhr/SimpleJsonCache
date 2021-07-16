@@ -1,16 +1,21 @@
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using SimpleJSON;
+using Newtonsoft.Json;
 
 public static class JsonCache {
 
 	#region <<---------- Properties ---------->>
 	
-	public const string ROOT_FOLDER = "../JsonData/";
+	private const string ROOT_FOLDER = "../JsonData/";
+
+	private static readonly JsonSerializerSettings DefaultSerializer = new() {
+		Culture = CultureInfo.InvariantCulture,
+		MissingMemberHandling = MissingMemberHandling.Ignore,
+		NullValueHandling = NullValueHandling.Ignore
+	};
 	
 	#endregion <<---------- Properties ---------->>
 
@@ -19,75 +24,51 @@ public static class JsonCache {
 	
 	#region <<---------- Public ---------->>
 	
-	public static async Task SaveJsonAsync(string path, JSONNode jsonNode) {
-		if (string.IsNullOrEmpty(path) || jsonNode == null) return;
-
-		var filePathWithExtension = $"{Path.Combine(ROOT_FOLDER, path)}.json";
-
-		// create folder
-		Directory.CreateDirectory(Path.GetDirectoryName(filePathWithExtension));
-
-		// write
-		await using (StreamWriter writer = File.CreateText(filePathWithExtension)) {
-			Console.WriteLine($"Writing file: {filePathWithExtension.Replace(ROOT_FOLDER, string.Empty)}");
-			await writer.WriteAsync(jsonNode.ToString(4));
-		}
-	}
-
-	public static async Task<List<JSONNode>> GetAllJsonInsideFolderAsync(string directoryPath, bool recursive = false, string fileName = "") {
-		var jsonNodeList = new List<JSONNode>();
+	/// <summary>
+	/// Serialize and save to file an object.
+	/// </summary>
+	/// <returns>Returns TRUE if success.</returns>
+	public static bool SaveToJson<T>(string filePath, T @object) {
 		try {
-			directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
-			if (!Directory.Exists(directoryPath))
-			{
-				throw new Exception("Folder path not found  :" + directoryPath);
-			}
-			var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-			foreach (var completeFilePath in filesPath) {
-				var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
-				if (string.IsNullOrEmpty(filePath)) continue;
-				filePath = filePath.Replace('\\', '/');
-				var json = await LoadJsonAsync(filePath);
-				if (json != null) jsonNodeList.Add(json);
-			}
-			return jsonNodeList;
-		} catch (Exception e) {
-			Console.WriteLine($"Exception at {nameof(GetAllJsonInsideFolderAsync)}:\n{e}");
-		}
-		return jsonNodeList;
-	}
+			if (string.IsNullOrEmpty(filePath)) return false;
 
-	public static async Task<JSONNode> LoadJsonAsync(string filePath, TimeSpan maxCacheAge = default){
-		try {
-			var jsonString = await LoadJsonStringAsync(filePath, maxCacheAge);
-			if (string.IsNullOrEmpty(jsonString)) return null;
-			return JSON.Parse(jsonString);
+			var filePathWithExtension = $"{Path.Combine(ROOT_FOLDER, filePath)}.json";
+
+			// create folder
+			Directory.CreateDirectory(Path.GetDirectoryName(filePathWithExtension));
+
+			var jsonObject = JsonConvert.SerializeObject(@object, Formatting.Indented, DefaultSerializer);
+		
+			// write
+			using (var writer = File.CreateText(filePathWithExtension)) {
+				Console.WriteLine($"Writing file: {filePathWithExtension.Replace(ROOT_FOLDER, string.Empty)}");
+				writer.Write(jsonObject);
+			}
+			return true;
 		} catch (Exception e) {
 			Console.WriteLine(e);
 		}
-		return string.Empty;
+		return false;
 	}
 
-	public static async Task<JSONNode> LoadValueAsync(string filePath, string key) {
+	public static T LoadFromJson<T>(string filePath, TimeSpan maxCacheAge = default){
 		try {
-			var jsonString = await LoadJsonStringAsync(filePath);
-			if (string.IsNullOrEmpty(jsonString)) return null;
-			var jsonNode = JSON.Parse(jsonString);
-			return jsonNode[key];
+			var jsonString = LoadJsonString(filePath, maxCacheAge);
+			if (string.IsNullOrEmpty(jsonString)) return default;
+			return JsonConvert.DeserializeObject<T>(jsonString, DefaultSerializer);
 		} catch (Exception e) {
 			Console.WriteLine(e);
 		}
-		return string.Empty;
+		return default;
 	}
 
-	public static async Task<bool> DeleteAsync(string path) {
+	public static bool Delete(string path) {
 		path = path.Replace('\\', '/').Trim();
 		try {
 			var filePath = $"{Path.Combine(ROOT_FOLDER, path)}.json";
 			if (!File.Exists(filePath)) return false;
-			await using (new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None, 1, FileOptions.DeleteOnClose | FileOptions.Asynchronous)) {
-				return true;
-			}
+			File.Delete(filePath);
+			return true;
 		} catch (Exception e) {
 			Console.WriteLine(e);
 		}
@@ -114,6 +95,26 @@ public static class JsonCache {
 		return false;
 	}
 	
+	// public static async Task<List<JSONNode>> GetAllJsonInsideFolderAsync(string directoryPath, bool recursive = false, string fileName = "") {
+	// 	var jsonNodeList = new List<JSONNode>();
+	// 	try {
+	// 		directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
+	// 		if (!Directory.Exists(directoryPath)) return jsonNodeList;
+	// 		var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+	// 		foreach (var completeFilePath in filesPath) {
+	// 			var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
+	// 			if (string.IsNullOrEmpty(filePath)) continue;
+	// 			filePath = filePath.Replace('\\', '/');
+	// 			var json = await LoadJsonAsync(filePath);
+	// 			if (json != null) jsonNodeList.Add(json);
+	// 		}
+	// 		return jsonNodeList;
+	// 	} catch (Exception e) {
+	// 		Console.WriteLine($"Exception at {nameof(GetAllJsonInsideFolderAsync)}:\n{e}");
+	// 	}
+	// 	return jsonNodeList;
+	// }
+	
 	#endregion <<---------- Public ---------->>
 
 	
@@ -121,7 +122,7 @@ public static class JsonCache {
 	
 	#region <<---------- Private ---------->>
 	
-	private static async Task<string> LoadJsonStringAsync(string filePath, TimeSpan maxCacheAge = default) {
+	private static string LoadJsonString(string filePath, TimeSpan maxCacheAge = default) {
 		filePath = filePath.Replace('\\', '/').Trim();
 		try {
 			var filePathWithExtension = $"{ROOT_FOLDER}{filePath}.json";
@@ -133,20 +134,19 @@ public static class JsonCache {
 				var cacheAge = DateTime.UtcNow - info.LastWriteTimeUtc;
 				if (cacheAge > maxCacheAge) {
 					Console.WriteLine($"Deleting cache with age {cacheAge} from path '{filePathWithExtension}'");
-					await using (new FileStream(filePathWithExtension, FileMode.Open, FileAccess.Read, FileShare.None, 1, FileOptions.DeleteOnClose | FileOptions.Asynchronous)) { }
+					File.Delete(filePathWithExtension);
 					return null;
 				}
 			}
-			
-			await using (var sourceStream = new FileStream(filePathWithExtension, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous)) {
-				var sb = new StringBuilder();
-				byte[] buffer = new byte[0x1000];
-				int numRead = 0;
-				while ((numRead = await sourceStream.ReadAsync(buffer, 0, buffer.Length)) != 0) {
-					sb.Append(Encoding.UTF8.GetString(buffer, 0, numRead));
-				}
-				return sb.ToString();
+
+			using var sourceStream = new FileStream(filePathWithExtension, FileMode.Open, FileAccess.Read, FileShare.Read, 4096);
+			var sb = new StringBuilder();
+			byte[] buffer = new byte[0x1000];
+			int numRead = 0;
+			while ((numRead = sourceStream.Read(buffer, 0, buffer.Length)) != 0) {
+				sb.Append(Encoding.UTF8.GetString(buffer, 0, numRead));
 			}
+			return sb.ToString();
 		} catch (Exception e) {
 			Console.WriteLine(e);
 		}
