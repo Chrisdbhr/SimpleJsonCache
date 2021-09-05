@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,10 +12,11 @@ public static class JsonCache {
 	
 	private const string ROOT_FOLDER = "../JsonData/";
 
-	private static readonly JsonSerializerSettings DefaultSerializer = new() {
+	public static readonly JsonSerializerSettings DefaultSerializer = new() {
 		Culture = CultureInfo.InvariantCulture,
 		MissingMemberHandling = MissingMemberHandling.Ignore,
-		NullValueHandling = NullValueHandling.Ignore
+		NullValueHandling = NullValueHandling.Ignore,
+		ReferenceLoopHandling = ReferenceLoopHandling.Ignore
 	};
 	
 	#endregion <<---------- Properties ---------->>
@@ -95,25 +97,25 @@ public static class JsonCache {
 		return false;
 	}
 	
-	// public static async Task<List<JSONNode>> GetAllJsonInsideFolderAsync(string directoryPath, bool recursive = false, string fileName = "") {
-	// 	var jsonNodeList = new List<JSONNode>();
-	// 	try {
-	// 		directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
-	// 		if (!Directory.Exists(directoryPath)) return jsonNodeList;
-	// 		var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-	// 		foreach (var completeFilePath in filesPath) {
-	// 			var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
-	// 			if (string.IsNullOrEmpty(filePath)) continue;
-	// 			filePath = filePath.Replace('\\', '/');
-	// 			var json = await LoadJsonAsync(filePath);
-	// 			if (json != null) jsonNodeList.Add(json);
-	// 		}
-	// 		return jsonNodeList;
-	// 	} catch (Exception e) {
-	// 		Console.WriteLine($"Exception at {nameof(GetAllJsonInsideFolderAsync)}:\n{e}");
-	// 	}
-	// 	return jsonNodeList;
-	// }
+	public static List<T> GetAllJsonInsideFolder<T>(string directoryPath, bool recursive = false, string fileName = "") {
+		try {
+			var jsonList = new List<T>();
+			directoryPath = Path.Combine(ROOT_FOLDER, directoryPath);
+			if (!Directory.Exists(directoryPath)) return default;
+			var filesPath = Directory.GetFiles(directoryPath, $"{fileName}*.json", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+			foreach (var completeFilePath in filesPath) {
+				var filePath = completeFilePath.Substring(ROOT_FOLDER.Length).Replace(".json", string.Empty);
+				if (string.IsNullOrEmpty(filePath)) continue;
+				filePath = filePath.Replace('\\', '/');
+				var json = LoadFromJson<T>(filePath);
+				if (json != null) jsonList.Add(json);
+			}
+			return jsonList;
+		} catch (Exception e) {
+			Console.WriteLine($"Exception at {nameof(GetAllJsonInsideFolder)}:\n{e}");
+		}
+		return default;
+	}
 	
 	#endregion <<---------- Public ---------->>
 
